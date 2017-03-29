@@ -1,0 +1,11 @@
+--prune-empty-dirs
+--delete
+--delete-excluded
+--cvs-exclude
+--exclude *.so.*
+--exclude *.snap
+--exclude *.deb
+--exclude *.lo
+--exclude *.la
+--exclude *.lai
+--exclude work

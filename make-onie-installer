@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+shopt -s nullglob
+set -e
+set -x
+
+# Supported Platforms
+PLATFORMS="alphanetworks-snc-60a0-486f|extreme-x870"
+
+TOP=`pwd`
+ONIE_VERSION=4.4.49-opx-1
+WORKDIR=$TOP/work
+KERNEL_REPO="git://kernel.ubuntu.com/rtg/ubuntu-xenial"
+KERNEL_REPO_BRANCH="OpenNSL"
+GITKERNEL=${KERNEL_REPO##*/}
+DEFCONFIG=$TOP/defconfig_ubuntu_extreme_amd64
+KERNELSRC=$WORKDIR/$GITKERNEL
+ROOTFS_URL="http://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-root.tar.gz"
+ROOTFS_TGZ=${ROOTFS_URL##*/}
+ROOTDIR=$WORKDIR/rootfs
+UBUNTU_TGZ=$WORKDIR/ubuntu-rootfs.tgz
+INSTALLER_DIR=$TOP/installer
+CLOUD_DIR=$INSTALLER_DIR/cloud-init
+CLOUD_INIT_DATA=$CLOUD_DIR/extreme.user-data
+
+function cleanup() {
+    sudo rm -rf $ROOTDIR/*
+}
+
+function clean() {
+    sudo rm -f $WORKDIR/linux-*-extreme-*
+    sudo rm -f $UBUNTU_TGZ
+}
+
+function distclean() {
+    sudo rm -rf $WORKDIR
+}
+
+function usage() {
+    echo "$0 [--clean|--distclean]"
+}
+
+ONIE_VERSION='opx-1'
+USE_UBUNTU_CHAN=stable
+while [[ $# -gt 0 ]] ; do
+    key=$1
+    case $key in
+        -c|--clean)
+            CLEAN=1
+            ;;
+        -d|--distclean)
+            CLEAN=1
+            DISTCLEAN=1
+            ;;
+        *)
+            break
+            ;;
+    esac
+    shift
+done
+
+PLATFORM=$1
+if [ -z "$PLATFORM" ] ; then
+    echo "Missing required arg: <platform>"
+    usage
+    exit 1
+fi
+
+PLATFORM_LINK=$TOP/installer/installer/platform.conf
+MACHINE_LINK=$TOP/installer/installer/machine.conf
+if [[ "$PLATFORM" =~ ^($PLATFORMS)$ ]] ; then
+    rm -f $MACHINE_LINK
+    rm -f $PLATFORM_LINK
+    set +e
+    cp $TOP/installer/installer/machine.$1.conf $MACHINE_LINK
+    cp $TOP/installer/installer/platform.$1.conf $PLATFORM_LINK
+    set -e
+    INSTALLER_NAME=$TOP/ecos-ubuntu-onie-installer-x86_64-$PLATFORM-$ONIE_VERSION.bin
+else
+    echo "Invalid platform; must be one of $PLATFORMS"
+    exit 1
+fi
+
+#
+# Clean
+#
+if [ ! -z "$CLEAN" ] ; then
+    clean
+fi
+if [ ! -z "$DISTCLEAN" ] ; then
+    distclean
+fi
+
+#
+# Build the kernel
+#
+test -d $WORKDIR || mkdir -p $WORKDIR
+pushd $WORKDIR
+if [ ! -d $KERNELSRC ] ; then
+    git clone $KERNEL_REPO -b $KERNEL_REPO_BRANCH
+fi
+files=( linux-image-*.deb )
+if (( ! ${#files[@]} )) ; then
+    cp $DEFCONFIG $KERNELSRC/.config
+    make -C $KERNELSRC oldconfig
+    make -j4 -C $KERNELSRC deb-pkg LOCALVERSION=-amd64
+fi
+popd
+
+
+#
+# Create the rootfs
+#
+
+cleanup
+test -d $ROOTDIR || mkdir -p $ROOTDIR
+pushd $WORKDIR
+test -f $ROOTFS_TGZ || wget $ROOTFS_URL
+sudo tar -C $ROOTDIR -xzf $ROOTFS_TGZ
+sudo dpkg -i --root=$ROOTDIR linux-image-*.deb
+sudo cp $CLOUD_INIT_DATA $ROOTDIR/boot/cloud.user-data
+pushd $ROOTDIR
+sudo tar -zcf $UBUNTU_TGZ *
+popd
+popd
+cleanup
+
+#
+# Put it all together in an ONIE installer
+#
+pushd $INSTALLER_DIR
+./combine $INSTALLER_NAME $UBUNTU_TGZ
+popd

@@ -1,0 +1,7 @@
+#cloud-config
+hostname: ecos
+password: extreme
+chpasswd: { expire: False }
+ssh_authorized_keys:
+  - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDG2Z4+d0vdg7S6L/tp52PfXpSgFT63c+syKDptOvpZHEo0HwUAvJhSRWY/avBP4RfVeZM02l/4xfKOTWIlC9EWTrcKIeKSViwx43WM6Q1oM7b3R2PIRbJOBJUBkF51CJ+4nSV/PUR8/tos+Am8uGE5SZId2HwRm5iTB6jQheqAjqlXQj4Kx3dUkKancKQ7pzVs40MsUByBxODv7mn0b4plmPoxvEYrKbGHpYF3CC+1XGE4t+aHHPmLCAnTrvKO1DC6JwqSyHxR+2eHnplv3mMvesk4MgkbWR7aqPmm5fV3n8k7FKC7Oh4sdzphfw7ekbjUs3AckPg92UkZg3YPZJQN mberger@debian
+package_upgrade: true

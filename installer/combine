@@ -1,0 +1,32 @@
+#!/bin/bash
+
+set -x
+set -e
+
+output=$1
+rootfs=$2
+
+printf "Using ${rootfs} as the rootfs\n"
+printf "Using ${output} as the output file\n"
+
+cp -vf ${rootfs} installer/rootfs.tgz
+
+# Temporary tar file
+tar=$(mktemp)
+
+# Tar up the installer files
+tar -cvf ${tar} installer
+
+# Compute sum
+sha1=$(cat $tar | sha1sum | awk '{print $1}')
+
+# Seed composite installer file
+cp sharch_body.sh ${output}
+
+sed -i -e "s/%%IMAGE_SHA1%%/$sha1/" ${output}
+
+# Append the tarball
+cat ${tar} >> ${output}
+
+# Cleanup
+/bin/rm -f ${tar} installer/rootfs.tgz
